@@ -6,16 +6,17 @@ Main script to train BERT. Run this script from command line with required argum
 import os
 from dataclasses import dataclass, field
 from typing import Optional
+from arg_parser import MainArgumentParser
 
 
 @dataclass
 class ModelArguments:
     """ Bert config. The model architecture can be fully customized by these arguments. The default values are
     mostly same as original BERT Base model."""
-    model_name: Optional[str] = field(
+    model_name: str = field(
         default="model",
         metadata={
-            "help": "an optional name for model",
+            "help": "A Name for model",
         }
     )
     model_dim: int = field(
@@ -60,12 +61,6 @@ class ModelArguments:
             "help": "Epsilon value of normalizer layer."
         }
     )
-    save_args_path: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "An optional path to save these arguments. (None if you don't want to save args.)"
-        }
-    )
 
 
 @dataclass
@@ -82,30 +77,22 @@ class TrainingDataArguments:
         }
     )
     line_by_line: bool = field(
-        default=True,
+        default=False,
         metadata={
             "help": "Whether distinct lines of text in the dataset are to be handled as distinct sequences."
         }
     )
-    max_train_samples: Optional[int] = field(
-        default=None,
-        metadata={
-            "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
-                    "value if set."
-        }
-    )
-    max_eval_samples: Optional[int] = field(
-        default=None,
-        metadata={
-            "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
-                    "value if set."
-        }
-    )
-    save_args_path: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "An optional path to save these arguments. (None if you don't want to save args.)"
-        }
-    )
+
+
+def main():
+    parser = MainArgumentParser((ModelArguments, TrainingDataArguments))
+    model_args, dataset_args = parser.parse_args_into_dataclasses()
+    print(model_args)
+    print()
+    print(dataset_args)
+
+
+if __name__ == "__main__":
+    main()
 
 
