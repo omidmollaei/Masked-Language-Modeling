@@ -67,3 +67,45 @@ class ModelArguments:
         }
     )
 
+
+@dataclass
+class TrainingDataArguments:
+    """The argument for building a train and a validation dataset."""
+    train_files_path: str = field(
+        metadata={
+            "help": "Path to training data files. The files must be in `.txt` format."
+        }
+    )
+    valid_files_path: str = field(
+        metadata={
+            "help": "Path to validating data files. The files must be in `.txt` format."
+        }
+    )
+    line_by_line: bool = field(
+        default=True,
+        metadata={
+            "help": "Whether distinct lines of text in the dataset are to be handled as distinct sequences."
+        }
+    )
+    max_train_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
+                    "value if set."
+        }
+    )
+    max_eval_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
+                    "value if set."
+        }
+    )
+    save_args_path: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "An optional path to save these arguments. (None if you don't want to save args.)"
+        }
+    )
+
+
