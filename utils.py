@@ -3,13 +3,27 @@ import os
 import dataclasses
 import tensorflow as tf
 import tensorflow_text as text
+from copy import copy
 from pathlib import Path
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentTypeError
 from argparse import ArgumentDefaultsHelpFormatter
-from typing import Any, Iterable, Dict, NewType, Union, get_type_hints
+from typing import Any, Iterable, Dict, NewType, Union, Optional, get_type_hints
 from tensorflow_text.tools.wordpiece_vocab import bert_vocab_from_dataset as bert_vocab
 
 DataClassType = NewType("DataClassType", Any)
+
+
+def string_to_bool(s):
+    if isinstance(s, bool):
+        return s
+    if s.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif s.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise ArgumentTypeError(
+            f"Truthy value expected: got {s} but expected one of yes/no, true/false, t/f, y/n, 1/0 (case insensitive)."
+        )
 
 
 class MainArgumentParser(ArgumentParser):
@@ -49,16 +63,47 @@ class MainArgumentParser(ArgumentParser):
         if isinstance(aliases, str):
             aliases = [aliases]
 
-        if field.type is not bool:
-            kwargs["type"] = field.type
+        origin_type = getattr(field.type, "__origin__", field.type)
+        if origin_type is Union:
+            if str not in field.type.__args__ and (
+                    len(field.type.__args__) != 2 or type(None) not in field.type.__args__):
+                raise ValueError(
+                    "Only `Union[X, NoneType]` (i.e., `Optional[X]`) is allowed for `Union` because"
+                    " the argument parser only supports one type per argument."
+                    f" Problem encountered in field '{field.name}'."
+                )
+            if type(None) not in field.type.__args__:
+                # filter `str` in Union
+                field.type = field.type.__args__[0] if field.type.__args__[1] == str else field.type.__args__[1]
+                origin_type = getattr(field.type, "__origin__", field.type)
+            elif bool not in field.type.__args__:
+                # filter `NoneType` in Union (except for `Union[bool, NoneType]`)
+                field.type = (
+                    field.type.__args__[0] if isinstance(None, field.type.__args__[1]) else field.type.__args__[1]
+                )
+                origin_type = getattr(field.type, "__origin__", field.type)
 
+        if field.type is bool or field.type == Optional[bool]:
+            kwargs["type"] = string_to_bool
+            if field.type is bool or (field.default is not None and field.default is not dataclasses.MISSING):
+                # Default value is False if we have no default when of type bool.
+                default = False if field.default is dataclasses.MISSING else field.default
+                # This is the value that will get picked if we don't include --field_name in any way
+                kwargs["default"] = default
+                # This tells argparse we accept 0 or 1 value after --field_name
+                kwargs["nargs"] = "?"
+                # This is the value that will get picked if we do --field_name (without value)
+                kwargs["const"] = True
+        else:
+            kwargs["type"] = field.type
             if field.default is not dataclasses.MISSING:
                 kwargs["default"] = field.default
+            elif field.default_factory is not dataclasses.MISSING:
+                kwargs["default"] = field.default_factory()
             else:
                 kwargs["required"] = True
-            parser.add_argument(field_name, *aliases, **kwargs)
-        else:
-            parser.add_argument(field_name, *aliases, action="store_true",  **kwargs)
+        parser.add_argument(field_name, *aliases, **kwargs)
+
 
     def parse_args_into_dataclasses(self):
         """Parse command-line args into instances of the specified dataclass types.
