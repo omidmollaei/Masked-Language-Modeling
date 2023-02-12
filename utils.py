@@ -6,7 +6,7 @@ import tensorflow_text as text
 from pathlib import Path
 from argparse import ArgumentParser, ArgumentTypeError
 from argparse import ArgumentDefaultsHelpFormatter
-from typing import Any, Iterable, Dict, NewType, Union, Optional, get_type_hints
+from typing import Any, Iterable, Dict, NewType, Union, Optional, List, get_type_hints
 from tensorflow_text.tools.wordpiece_vocab import bert_vocab_from_dataset as bert_vocab
 
 DataClassType = NewType("DataClassType", Any)
@@ -42,7 +42,7 @@ class MainArgumentParser(ArgumentParser):
         super().__init__(**kwargs)
         if dataclasses.is_dataclass(dataclass_types):
             dataclass_types = [dataclass_types]
-        self.dataclass_types = list(dataclass_types)
+        self.dataclass_types: List[DataClassType] = list(dataclass_types)
         for dtype in self.dataclass_types:
             self._add_dataclass_arguments(dtype)
 
@@ -103,7 +103,6 @@ class MainArgumentParser(ArgumentParser):
                 kwargs["required"] = True
         parser.add_argument(field_name, *aliases, **kwargs)
 
-
     def parse_args_into_dataclasses(self):
         """Parse command-line args into instances of the specified dataclass types.
         Returns:
@@ -160,16 +159,15 @@ def build_tokenizer(dataset_args: DataClassType):
 
     # ---------------------- Build the tokenizer -------------------------- #
     tokenizer = SubWordTokenizer(
-        path=vocab_path,
-        lower_case=
-        dataset_args.lower_case
+        vocab_path=vocab_path,
+        lower_case=dataset_args.lower_case,
     )
 
 
 class SubWordTokenizer(tf.Module):
     def __init__(self, vocab_path: str, lower_case: bool = True, **kwargs):
         super().__init__(**kwargs)
-        self.tokenizer = text.BertTokenizer(vocab_path, lower_case=True)
+        self.tokenizer = text.BertTokenizer(vocab_path, lower_case=lower_case)
         self._reserved_tokens = ["[START]", "[END]", "[UNK]", "[PAD]", "[MASK]"]
         self._vocab_path = tf.saved_model.Asset(vocab_path)
 
