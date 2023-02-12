@@ -3,7 +3,6 @@ import os
 import dataclasses
 import tensorflow as tf
 import tensorflow_text as text
-from copy import copy
 from pathlib import Path
 from argparse import ArgumentParser, ArgumentTypeError
 from argparse import ArgumentDefaultsHelpFormatter
@@ -168,7 +167,7 @@ def build_tokenizer(dataset_args: DataClassType):
 
 
 class SubWordTokenizer(tf.Module):
-    def __init__(self, vocab_path: str, lower_case:bool = True, **kwargs):
+    def __init__(self, vocab_path: str, lower_case: bool = True, **kwargs):
         super().__init__(**kwargs)
         self.tokenizer = text.BertTokenizer(vocab_path, lower_case=True)
         self._reserved_tokens = ["[START]", "[END]", "[UNK]", "[PAD]", "[MASK]"]
@@ -177,6 +176,59 @@ class SubWordTokenizer(tf.Module):
         vocab = Path(vocab_path).read_text().splitlines()
         self.vocab = tf.Variable(vocab)
 
+        self.start_token_id = tf.argmax(tf.constant(self._reserved_tokens) == "[START]")
+        self.end_token_id = tf.argmax(tf.constant(self._reserved_tokens) == "[END]")
+
+        # create signature for export:
+        self.tokenize.get_concrete_function(tf.TensorSpec(shape=[None], dtype=tf.string))
+        self.add_start_end.get_concrete_function(tf.RaggedTensorSpec(shape=[None, None], dtype=tf.int64))
+        self.cleanup_text.get_concrete_function(tf.TensorSpec(shape=[None], dtype=tf.string))
+        self.detokenize.get_concrete_function(tf.TensorSpec(shape=[None, None], dtype=tf.int64))
+        self.detokenize.get_concrete_function(tf.RaggedTensorSpec(shape=[None, None], dtype=tf.int64))
+        self.lookup.get_concrete_function(tf.TensorSpec(shape=[None, None], dtype=tf.int64))
+        self.lookup.get_concrete_function(tf.RaggedTensorSpec(shape=[None, None], dtype=tf.int64))
+
+    # docstring must be added to below functions
+    @tf.function
+    def add_start_end(self, tokenized):
+        count = tokenized.bounding_shape()[0]
+        starts = tf.fill([count, 1], self.start_token_id)
+        ends = tf.fill([count, 1], self.end_token_id)
+        return tf.concat([starts, tokenized, ends], axis=1)
+
+    @tf.function
+    def cleanup_text(self, sentences):
+        pattern = b"\\[START\\]\\[END\\]\\[PAD\\]"
+        sentences_cleaned = tf.strings.regex_replace(sentences, pattern, "")
+        return tf.strings.strip(sentences_cleaned)
+
+    @tf.function
+    def tokenize(self, strings):
+        enc = self.tokenizer.tokenize(strings)   # produce a ragged tensor (int64)
+        enc = enc.merge_dim(-2, -1)              # merge the `word` and `word-piece` axes.
+        return self.add_start_end(enc)
+
+    @tf.function
+    def detokenize(self, tokenized):
+        words = self.tokenizer.detokenize(tokenized)
+        sentences = tf.strings.reduce_join(words, separator=" ")
+        return self.cleanup_text(sentences)
+
+    @tf.function
+    def lookup(self, token_ids):
+        return tf.gather(self.vocab, token_ids)
+
+    @tf.function
+    def get_vocab_size(self):
+        return tf.shape(self.vocab)[0]
+
+    @tf.function
+    def get_vocab_path(self):
+        return self._vocab_path
+
+    @tf.function
+    def get_reserved_tokens(self):
+        return tf.constant(self._reserved_tokens)
 
 
 def load_tf_dataset(path: str, cycle_length: Union[None, int]):
