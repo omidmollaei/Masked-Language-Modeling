@@ -50,6 +50,8 @@ class MainArgumentParser(ArgumentParser):
         parser = self
         type_hints: Dict[str, type] = get_type_hints(dtype)
         for field in dataclasses.fields(dtype):
+            if dataclasses.is_dataclass(field.default):  # we do not want to parse dataclass types into CLI args.
+                continue
             field.type = type_hints[field.name]
             self._parse_dataclass_field(parser, field)
 
@@ -120,12 +122,46 @@ class MainArgumentParser(ArgumentParser):
 
 
 def write_vocab_file(file_path: str, vocab: list):
+    """
+    Save the vocabulary extracted by trained (sub-word)tokenizer to disk.
+    Args:
+        file_path: Path to save the file . (it should contain the file name too. e.g ./vocab/vocab.txt)
+        vocab: List of vocab.
+    Return:
+        None.
+    """
     with open(file_path, "w") as f:
         for token in vocab:
             print(token, file=f)
 
 
+def load_tf_dataset(path: str, cycle_length: Union[None, int]):
+    """
+    Load a tensorflow dataset from text files by interleaving the lines of files.
+    Args:
+        path: path to the folder containing `.txt` files.
+        cycle_length: Number of the files, reading concurrently.
+                    (more info: https://www.tensorflow.org/api_docs/python/tf/data/Dataset#interleave)
+    Return:
+        A tf.data.Dataset with no preprocessing.
+    """
+    files_ds = tf.data.Dataset.list_files(os.path.join(path, "*.txt"))
+    dataset = files_ds.interleave(
+        map_func=lambda filepath: tf.data.TextLineDataset(filepath),
+        cycle_length=cycle_length,
+        num_parallel_calls=tf.data.AUTOTUNE,
+    )
+    return dataset
+
+
 def build_tokenizer(dataset_args: DataClassType):
+    """
+    Build a (sub-word) tokenizer from a text-dataset. The dataset is an instance of `SubWordTokenizer` class.
+    Args:
+        dataset_args: A namespace(an instance of a dataclass) containing the arguments for preparing the dataset.
+    Return:
+        An instance of `SubWordTokenizer`.
+    """
     # -------- Prepare train dataset to build vocabulary of tokenizer ----------- #
     dataset = load_tf_dataset(
         path=dataset_args.train_files_path,
@@ -136,18 +172,20 @@ def build_tokenizer(dataset_args: DataClassType):
 
     # ------------------- Generate the vocabulary --------------------------- #
     bert_tokenizer_params = dict(lower_case=dataset_args.lower_case)
-    reserved_tokens = ["[PAD]", "[UNK]", "[START]", "[END]"]
+    reserved_tokens = [getattr(dataset_args.reserved_tokens, f.name) for f in
+                       dataclasses.fields(dataset_args.reserved_tokens) if f.name != "mask"]
+
     bert_vocab_args = dict(
-        vocab_size=dataset_args.vocab_size - 1,  # we would add [MASK] token later
+        vocab_size=dataset_args.vocab_size - 1,  # we would add mask token later.
         reserved_tokens=reserved_tokens,
         bert_tokenizer_params=bert_tokenizer_params,
-        leawrn_params={},
+        learn_params={},
     )
-    print("Generating tokenizer vocabulary ...")
+    print("Generating tokenizer vocabulary ...", end=" ")
     vocab = bert_vocab.bert_vocab_from_dataset(dataset, **bert_vocab_args)
-    vocab.append("[MASK]")
-    reserved_tokens.append("[MASK]")
-
+    vocab.append(dataset_args.reserved_tokens.mask)
+    reserved_tokens.append(dataset_args.reserved_tokens.mask)
+    print("done.")
     # update the size of vocabs if it is lower than specified vocab size by user in CLI.
     dataset_args.vocab_size = len(vocab)
 
@@ -160,15 +198,16 @@ def build_tokenizer(dataset_args: DataClassType):
     # ---------------------- Build the tokenizer -------------------------- #
     tokenizer = SubWordTokenizer(
         vocab_path=vocab_path,
+        reserved_tokens=reserved_tokens,
         lower_case=dataset_args.lower_case,
     )
 
 
 class SubWordTokenizer(tf.Module):
-    def __init__(self, vocab_path: str, lower_case: bool = True, **kwargs):
+    def __init__(self, vocab_path: str, reserved_tokens: list, lower_case: bool = True, **kwargs):
         super().__init__(**kwargs)
         self.tokenizer = text.BertTokenizer(vocab_path, lower_case=lower_case)
-        self._reserved_tokens = ["[START]", "[END]", "[UNK]", "[PAD]", "[MASK]"]
+        self._reserved_tokens = reserved_tokens
         self._vocab_path = tf.saved_model.Asset(vocab_path)
 
         vocab = Path(vocab_path).read_text().splitlines()
@@ -229,11 +268,3 @@ class SubWordTokenizer(tf.Module):
         return tf.constant(self._reserved_tokens)
 
 
-def load_tf_dataset(path: str, cycle_length: Union[None, int]):
-    files_ds = tf.data.Dataset.list_files(os.path.join(path, "*.txt"))
-    dataset = files_ds.interleave(
-        map_func=lambda filepath: tf.data.TextLineDataset(filepath),
-        cycle_length=cycle_length,
-        num_parallel_calls=tf.data.AUTOTUNE,
-    )
-    return dataset
