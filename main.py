@@ -123,10 +123,9 @@ def main():
     model_args, dataset_args = parser.parse_args_into_dataclasses()
     dataset_args.vocab_size = model_args.vocab_size
 
-    # -------------------------------
-    # ------ Build Tokenizer --------
-    # -------------------------------
+    # ------ Build Tokenizer ------- #
     tokenizer = utils.build_tokenizer(dataset_args)
+    model_args.vocab_size = dataset_args.vocab_size
 
 
 if __name__ == "__main__":
