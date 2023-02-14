@@ -207,7 +207,7 @@ def build_tokenizer(dataset_args: DataClassType):
 
 
 class SubWordTokenizer(tf.Module):
-    def __init__(self, vocab_path: str, saving_path:str, reserved_tokens: DataClassType,
+    def __init__(self, vocab_path: str, saving_path: str, reserved_tokens: DataClassType,
                  lower_case: bool = True, **kwargs):
         """
         Main class for model tokenizer. It's a subclass of tf.Module so we can export and reuse it easily later.
