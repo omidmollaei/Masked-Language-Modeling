@@ -310,3 +310,12 @@ class SubWordTokenizer(tf.Module):
         tf.saved_model.save(self, self.saving_path)
 
 
+def load_tokenizer(path: str):
+    """
+    Load a pretrained exported tokenizer from disk.
+    Args:
+        path: path to saved tokenizer.
+    Returns: Sub-word tokenizer.
+    """
+    reloaded_tokenizer = tf.saved_model.load(path)
+    return reloaded_tokenizer
