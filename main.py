@@ -47,6 +47,20 @@ class ModelArguments:
             "help": "Number of hidden layers in model."
         }
     )
+    intermediate_dense_size: Optional[int] = field(
+        default=3000,
+        metadata={
+            "help": "Number of units in intermediate dense layer."
+        }
+    )
+    classification_units: Optional[int] = field(
+        default=0,
+        metadata={
+            "help": "If set to a value more than 0, the model would have two outputs. One for MLM task and one"
+                    "for classification on the vector related to first token's output. This field indicates the"
+                    "number of units in classifier layer."
+        }
+    )
     dropout_rate: Optional[float] = field(
         default=0.1,
         metadata={
