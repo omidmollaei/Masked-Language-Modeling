@@ -246,6 +246,7 @@ class SubWordTokenizer(tf.Module):
         self.get_reserved_tokens.get_concrete_function()
         self.get_vocab_path.get_concrete_function()
         self.get_vocab_size.get_concrete_function()
+        #self.save.get_concrete_function()
 
     # docstring must be added to below functions
     @tf.function
@@ -305,7 +306,6 @@ class SubWordTokenizer(tf.Module):
         """Returns the list of reserved/special tokens"""
         return tf.constant(self._reserved_tokens_list)
 
-    @tf.function
     def save(self):
         tf.saved_model.save(self, self.saving_path)
 
