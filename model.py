@@ -114,7 +114,7 @@ class MultiHeadAttentionLayer(tf.keras.layers.Layer):
             inputs['value'],
             inputs['mask'],
         )
-        batch_size = tf.shape(query)
+        batch_size = tf.shape(query)[0]
 
         # -- linear layers
         query = self.query_dense(query)
@@ -122,9 +122,9 @@ class MultiHeadAttentionLayer(tf.keras.layers.Layer):
         value = self.value_dense(value)
 
         # -- split heads
-        query = self.split_head(query, batch_size)
-        key = self.split_head(key, batch_size)
-        value = self.split_head(value, batch_size)
+        query = self.split_heads(query, batch_size)
+        key = self.split_heads(key, batch_size)
+        value = self.split_heads(value, batch_size)
 
         # -- scaled dot-product attention
         scaled_attention = scaled_dot_product_attention(query, key, value, mask)
@@ -201,7 +201,7 @@ def mlm_model(params: DataClassType):
             [outputs, padding_mask]
         )
 
-    sequence_output = tf.keras.layers.Dense(params.vocab_size)
+    sequence_output = tf.keras.layers.Dense(params.vocab_size)(outputs)
 
     if params.classification_units:
         cls_output = tf.keras.layers.Dense(1)(outputs[:, 0, :])
