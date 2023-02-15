@@ -59,3 +59,34 @@ class PositionalEncoding(tf.keras.layers.Layer):
 
     def call(self, inputs: tf.Tensor):
         return inputs + self.pos_encoding[:, : tf.shape(inputs)[1], :]
+
+
+def scaled_dot_product_attention(query, key, value, mask):
+    """
+    Calculate the attention weights
+    Args:
+        query: query vectors . (shape: [batch_size, num_attention_heads, seq_length, depth])
+        key: key vectors. (shape: [batch_size, num_attention_heads, seq_length, depth])
+        value: value vectors. (shape: [batch_size, num_attention_heads, seq_length, depth])
+        mask: attention mask to prevent positions look at padding tokens.
+    Returns:
+        scaled dot product attention of input vectors .
+    """
+    matmul_qk = tf.matmul(query, key, transpose_b=True)
+    depth = tf.cast(tf.shape(key)[-1], dtype=tf.float32)
+    logits = matmul_qk / depth
+    if mask is not None:
+        logits += mask * -1e9
+    attention_weights = tf.nn.softmax(logits, axis=-1)
+    output = tf.matmul(attention_weights, value)
+    return output
+
+
+
+
+
+
+
+
+
+
