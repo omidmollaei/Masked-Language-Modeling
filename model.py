@@ -3,6 +3,15 @@ Define the model components here and build an encoder-only transformer model.
 """
 
 import tensorflow as tf
+from typing import Any, NewType
+from dataclasses import dataclass
+
+
+#@dataclass
+#class Params:
+#    d_model: int = field(default=512)
+
+DataClassType = NewType("DataClassType", Any)
 
 
 def create_padding_mask(x: tf.Tensor):
@@ -148,3 +157,35 @@ class MultiHeadAttentionLayer(tf.keras.layers.Layer):
         # -- final linear layer
         outputs = self.dense(concat_attention)
         return outputs
+
+
+def encoder_layer(params: DataClassType, name: str = "encoder_layer"):
+    """
+    The main function to build each of the encoder blocks.
+    Args:
+        params: A dataclass with required fields, containing the config for building the model.
+        name: An optional name for this encoder sub-block.
+    Returns:
+         The built encoder sub-block with keras functional api.
+    """
+    inputs = tf.keras.layers.Input(shape=(None, params.model_dim), name="inputs")
+    padding_mask = tf.keras.Input(shape=(1, 1, None), name="padding_mask")
+
+    attention = MultiHeadAttentionLayer(
+        num_heads=params.num_attention_heads, d_model=params.model_dim, name="attention"
+    )({
+        "query": inputs,
+        "key": inputs,
+        "value": inputs,
+        "mask": padding_mask,
+    })
+    attention = tf.keras.layers.Dropout(params.dropout_rate)(attention)
+    attention += tf.cast(inputs, dtype=tf.float32)
+    attention = tf.keras.layers.LayerNormalization(epsilon=params.layer_norm_eps)(attention)
+
+    outputs = tf.keras.layers.Dense(params.intermediate_dense_size, activation=params.activation)(attention)
+    outputs = tf.keras.layers.Dense(params.model_dim)(outputs)
+    outputs = tf.keras.layers.Dropout(params.dropout_rate)(outputs)
+    outputs += attention
+    outputs = tf.keras.layers.LayerNormalization(epsilon=params.layer_norm_eps)(outputs)
+    return tf.keras.Model(inputs=[inputs, padding_mask], outputs=outputs, name=name)
