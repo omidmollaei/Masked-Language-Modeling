@@ -82,11 +82,69 @@ def scaled_dot_product_attention(query, key, value, mask):
     return output
 
 
+class MultiHeadAttentionLayer(tf.keras.layers.Layer):
+    def __init__(self, num_heads: int, d_model: int, **kwargs):
+        """
+        Args:
+            num_heads: number of attention heads.
+            d_model: model dimension.
+        """
+        assert d_model % num_heads == 0
+        super(MultiHeadAttentionLayer, self).__init__(**kwargs)
+        self.num_heads = num_heads
+        self.d_model = d_model
+        self.depth = self.d_model // self.num_heads
+        self.query_dense = tf.keras.layers.Dense(self.d_model)
+        self.key_dense = tf.keras.layers.Dense(self.d_model)
+        self.value_dense = tf.keras.layers.Dense(self.d_model)
+        self.dense = tf.keras.layers.Dense(self.d_model)
 
+    def get_config(self):
+        config = super(MultiHeadAttentionLayer, self).get_config()
+        config.update({"num_heads": self.num_heads, "d_model": self.d_model})
+        return config
 
+    def split_heads(self, inputs: tf.Tensor, batch_size: int):
+        inputs = tf.keras.layers.Lambda(
+            lambda x: tf.reshape(x, shape=(batch_size, -1, self.num_heads, self.depth))
+        )(inputs)
 
+        return tf.keras.layers.Lambda(
+            lambda x: tf.transpose(x, perm=[0, 2, 1, 3])
+        )(inputs)
 
+    def call(self, inputs: tf.Tensor):
+        query, key, value, mask = (
+            inputs['query'],
+            inputs['key'],
+            inputs['value'],
+            inputs['mask'],
+        )
+        batch_size = tf.shape(query)
 
+        # -- linear layers
+        query = self.query_dense(query)
+        key = self.key_dense(key)
+        value = self.value_dense(value)
 
+        # -- split heads
+        query = self.split_head(query, batch_size)
+        key = self.split_head(key, batch_size)
+        value = self.split_head(value, batch_size)
 
+        # -- scaled dot-product attention
+        scaled_attention = scaled_dot_product_attention(query, key, value, mask)
+        scaled_attention = tf.keras.layers.Lambda(
+            lambda x: tf.transpose(x, perm=[0, 2, 1, 3])
+        )(scaled_attention)
 
+        # -- concatenation of heads
+        concat_attention = tf.keras.layers.Lambda(
+            lambda x: tf.reshape(
+                x, (batch_size, -1, self.d_model)
+            )
+        )(scaled_attention)
+
+        # -- final linear layer
+        outputs = self.dense(concat_attention)
+        return outputs
