@@ -6,6 +6,7 @@ Main script to train BERT. Run this script from command line with required argum
 import os
 import utils
 import tensorflow as tf
+from model import mlm_model
 from typing import Optional, Dict
 from dataclasses import dataclass, field
 
@@ -136,10 +137,21 @@ def main():
     parser = utils.MainArgumentParser((ModelArguments, TrainingDataArguments))
     model_args, dataset_args = parser.parse_args_into_dataclasses()
     dataset_args.vocab_size = model_args.vocab_size
+    init_vocab_size = model_args.vocab_size
 
-    # ------ Build Tokenizer ------- #
+    # -- Build tokenizer
+    print("Building tokenizer ... ", end="")
     tokenizer = utils.build_tokenizer(dataset_args)
     model_args.vocab_size = dataset_args.vocab_size
+    tokenizer.save()
+    print(f"done!. [Saved to: {dataset_args.tokenizer_saving_path}]")
+    print(f"[Number of vocab size updated from {init_vocab_size} to {model_args.vocab_size}]")
+
+    # -- Build model
+    print("Building model ... ", end="")
+    model = mlm_model(params=model_args)
+    num_params = model.count_params()
+    print(f"done! [Total number of params: {num_params}]")
 
 
 if __name__ == "__main__":

@@ -182,10 +182,9 @@ def build_tokenizer(dataset_args: DataClassType):
         bert_tokenizer_params=bert_tokenizer_params,
         learn_params={},
     )
-    print("Generating tokenizer vocabulary ...", end=" ")
+
     vocab = bert_vocab.bert_vocab_from_dataset(dataset, **bert_vocab_args)
     vocab.append(dataset_args.reserved_tokens.mask)  # we must be sure that the mask token is the last token.
-    print("done.")
     # update the size of vocabs if it is lower than specified vocab size by user in CLI.
     dataset_args.vocab_size = len(vocab)
 
@@ -246,7 +245,7 @@ class SubWordTokenizer(tf.Module):
         self.get_reserved_tokens.get_concrete_function()
         self.get_vocab_path.get_concrete_function()
         self.get_vocab_size.get_concrete_function()
-        #self.save.get_concrete_function()
+        # self.save.get_concrete_function()
 
     # docstring must be added to below functions
     @tf.function
