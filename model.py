@@ -4,12 +4,6 @@ Define the model components here and build an encoder-only transformer model.
 
 import tensorflow as tf
 from typing import Any, NewType
-from dataclasses import dataclass
-
-
-#@dataclass
-#class Params:
-#    d_model: int = field(default=512)
 
 DataClassType = NewType("DataClassType", Any)
 
@@ -17,15 +11,6 @@ DataClassType = NewType("DataClassType", Any)
 def create_padding_mask(x: tf.Tensor):
     mask = tf.cast(tf.math.equal(x, 0), dtype=tf.float32)
     return mask[:, tf.newaxis, tf.newaxis, :]
-
-
-def create_look_ahead_mask(x: tf.Tensor):
-    seq_len = tf.shape(x)[1]
-    look_ahead_mask = 1 - tf.linalg.band_part(
-        tf.ones((seq_len, seq_len), dtype=tf.float32), -1, 0
-    )
-    padding_mask = create_padding_mask(x)
-    return tf.maximum(look_ahead_mask, padding_mask)
 
 
 class PositionalEncoding(tf.keras.layers.Layer):
@@ -189,3 +174,36 @@ def encoder_layer(params: DataClassType, name: str = "encoder_layer"):
     outputs += attention
     outputs = tf.keras.layers.LayerNormalization(epsilon=params.layer_norm_eps)(outputs)
     return tf.keras.Model(inputs=[inputs, padding_mask], outputs=outputs, name=name)
+
+
+def mlm_model(params: DataClassType):
+    """
+    This function uses the fields of input dataclass to generate an encoder-only transformer model.
+    Args:
+        params: dataclass containing the required config for building the model.
+    Returns:
+        A keras functional model with one input and two outputs. the first output can be used for a binary
+    """
+    inputs = tf.keras.Input(shape=(None,), name="inputs")
+    padding_mask = tf.keras.layers.Lambda(
+        create_padding_mask, output_shape=(1, 1, None), name="enc_padding_mask"
+    )(inputs)
+
+    embeddings = tf.keras.layers.Embedding(params.vocab_size, params.model_dim)(inputs)
+    embeddings *= tf.math.sqrt(tf.cast(params.model_dim, dtype=tf.float32))
+    embeddings = PositionalEncoding(
+        position=params.vocab_size, d_model=params.model_dim
+    )(embeddings)
+
+    outputs = tf.keras.layers.Dropout(params.dropout_rate)(embeddings)
+    for i in range(params.num_hidden_layers):
+        outputs = encoder_layer(params, name=f"encoder_layer_{i}")(
+            [outputs, padding_mask]
+        )
+
+    sequence_output = tf.keras.layers.Dense(params.vocab_size)
+
+    if params.classification_units:
+        cls_output = tf.keras.layers.Dense(1)(outputs[:, 0, :])
+        return tf.keras.models.Model(inputs=[inputs], outputs=[cls_output, sequence_output], name=params.model_name)
+    return tf.keras.Model(inputs, sequence_output, name=params.model_name)
