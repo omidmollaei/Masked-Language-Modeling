@@ -156,18 +156,18 @@ def main():
     init_vocab_size = model_args.vocab_size
 
     # -- Build tokenizer
-    print("Building tokenizer ... ", end="")
+    print(f"{'='*40}\nTokenizer ... ")
     tokenizer = utils.build_tokenizer(dataset_args)
     model_args.vocab_size = dataset_args.vocab_size
-    tokenizer.save()
-    print(f"done!. [Saved to: {dataset_args.tokenizer_saving_path}]")
+    tf.saved_model.save(tokenizer, dataset_args.tokenizer_saving_path)
+    print(f"Building tokenizer finished. [Tokenizer saved to: {dataset_args.tokenizer_saving_path}]")
     print(f"[Number of vocab size updated from {init_vocab_size} to {model_args.vocab_size}]")
 
     # -- Build model
-    print("Building model ... ", end="")
+    print(f"{'='*40}\nBuilding model ... ")
     model = mlm_model(params=model_args)
     num_params = model.count_params()
-    print(f"done! [Total number of params: {num_params}]")
+    print(f"Building model finished ! [Total number of params: {num_params}]")
 
 
 if __name__ == "__main__":

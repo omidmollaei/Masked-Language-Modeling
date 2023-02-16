@@ -155,23 +155,25 @@ def load_tf_dataset(path: str, cycle_length: Union[None, int]):
     return dataset
 
 
-def build_tokenizer(dataset_args: DataClassType):
+def _build_vocab_file(dataset_args: DataClassType, update_vocab_size: bool = True):
     """
-    Build a (sub-word) tokenizer from a text-dataset. The dataset is an instance of `SubWordTokenizer` class.
+    Generates a tf dataset and use tensorflow_texts methods to build a source vocab
+    for sub-word tokenizer.
     Args:
         dataset_args: A namespace(an instance of a dataclass) containing the arguments for preparing the dataset.
-    Return:
-        An instance of `SubWordTokenizer`.
+    Returns:
+        None
     """
-    # -------- Prepare train dataset to build vocabulary of tokenizer ----------- #
+    # ======= Generate tf-dataset ======== #
     dataset = load_tf_dataset(
         path=dataset_args.train_files_path,
         cycle_length=dataset_args.cycle_length,
     )
     dataset = dataset.filter(lambda line: tf.strings.length(line) > 0)  # filter empty lines
     dataset = dataset.batch(1000).prefetch(2)
+    # ==================================== #
 
-    # ------------------- Generate the vocabulary --------------------------- #
+    # ========= Extract vocab  =========== #
     bert_tokenizer_params = dict(lower_case=dataset_args.lower_case)
     reserved_tokens = [getattr(dataset_args.reserved_tokens, f.name) for f in
                        dataclasses.fields(dataset_args.reserved_tokens) if f.name != "mask"]
@@ -182,25 +184,104 @@ def build_tokenizer(dataset_args: DataClassType):
         bert_tokenizer_params=bert_tokenizer_params,
         learn_params={},
     )
-
     vocab = bert_vocab.bert_vocab_from_dataset(dataset, **bert_vocab_args)
+    # ================================== #
+
+    # ====== Write vocab to Disk ======= #
     vocab.append(dataset_args.reserved_tokens.mask)  # we must be sure that the mask token is the last token.
-    # update the size of vocabs if it is lower than specified vocab size by user in CLI.
-    dataset_args.vocab_size = len(vocab)
+    vocab_file = os.path.join(dataset_args.tokenizer_saving_path, "vocabulary", "vocab.txt")
+    write_vocab_file(vocab_file, vocab)
 
-    # save vocabs as text file in disk.
-    vocab_path = os.path.join(dataset_args.tokenizer_saving_path, "vocabulary")
-    os.makedirs(vocab_path, exist_ok=True)
-    vocab_path = os.path.join(vocab_path, "vocab.txt")
-    write_vocab_file(vocab_path, vocab)
+    if update_vocab_size:
+        dataset_args.vocab_size = len(vocab)
+    # ================================= #
 
-    # ---------------------- Build the tokenizer -------------------------- #
+
+def _build_tokenizer_from_scratch(dataset_args: DataClassType):
+    """
+    This function builds tokenizer from scratch. If no tokenizer is found, or `overwrite_tokenizer`
+    arg is set to True by user, this function will build tokenizer.
+    Args:
+        dataset_args: A namespace(an instance of a dataclass) containing the arguments for preparing the dataset.
+    Returns:
+        An instance of `SubWordTokenizer`.
+    """
+
+    vocab_file = os.path.join(dataset_args.tokenizer_saving_path,  "vocabulary", "vocab.txt")
+    vocab_file_found = True if os.path.exists(vocab_file) else False
+
+    # ===========  Vocab File  =========== #
+    if dataset_args.overwrite_vocab:
+        # build vocab source file from scratch
+        print(f"Generating vocab from source dataset ... ")
+        _build_vocab_file(dataset_args, update_vocab_size=True)
+
+    elif not vocab_file_found:
+        # user tends to use already saved vocab source, but vocab file not found
+        print(f"No vocab file found. Generating vocab from source dataset ...")
+        _build_vocab_file(dataset_args, update_vocab_size=True)
+
+    else:
+        # user tends to use already saved vocab source and vocab file exists
+        print(f"Loading vocab from: {vocab_file}")
+        with open(vocab_file, 'r') as v:
+            vocab_loaded = v.readlines()
+            dataset_args.vocab_size = len(vocab_loaded)
+    # ================================== #
+
+    # =======  Build tokenizer ======== #
     tokenizer = SubWordTokenizer(
-        vocab_path=vocab_path,
+        vocab_path=vocab_file,
         saving_path=dataset_args.tokenizer_saving_path,
         reserved_tokens=dataset_args.reserved_tokens,
         lower_case=dataset_args.lower_case,
     )
+    # ================================== #
+
+    return tokenizer
+
+
+def build_tokenizer(dataset_args: DataClassType):
+    """
+    Build a (sub-word) tokenizer from a text-dataset or load the saved tokenizer. The tokenizer
+    is an instance of `SubWordTokenizer` class.
+    Args:
+        dataset_args: A namespace(an instance of a dataclass) containing the arguments for preparing the dataset.
+    Return:
+        An instance of `SubWordTokenizer`.
+    """
+    if not os.path.exists(dataset_args.tokenizer_saving_path):
+        os.makedirs(dataset_args.tokenizer_saving_path)
+        os.makedirs(os.path.join(dataset_args.tokenizer_saving_path, "vocabulary"))
+
+    # ==== Try loading a pre-trained tokenizer from specified
+    #      path by user in CLI. (`saving_tokenizer_path` arg)    ==== #
+    try:
+        tokenizer = load_tokenizer(dataset_args.tokenizer_saving_path)
+        tokenizer_found = True
+    except OSError:
+        tokenizer_found = False
+    # ============================================ #
+
+    # ====== Building tokenizer ====== #
+    if dataset_args.overwrite_tokenizer:
+        # here we do not care if a pretrained tokenizer exists or not.
+        # user wants to build one from scratch anyway.
+        print("Building tokenizer from scratch ... ")
+        tokenizer = _build_tokenizer_from_scratch(dataset_args)
+
+    elif not tokenizer_found:
+        # user wants to use pretrained tokenizer, but no pretrained tokenizer found.
+        # so build one from scratch.
+        print(f"No pretrained tokenizer found. Building one from scratch ... ")
+        tokenizer = _build_tokenizer_from_scratch(dataset_args)
+
+    else:
+        # user wants to load a pretrained tokenizer and one found.
+        # so we load that tokenizer.
+        print(f"Loading already saved tokenizer from : {dataset_args.tokenizer_saving_path}")
+        tokenizer = load_tokenizer(dataset_args.tokenizer_saving_path)
+    # =============================== #
 
     return tokenizer
 
