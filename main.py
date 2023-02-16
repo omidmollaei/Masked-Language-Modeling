@@ -131,6 +131,22 @@ class TrainingDataArguments:
             "help": "An instance of another dataclass which holds all the special tokens in one place."
         }
     )
+    overwrite_vocab: bool = field(
+        default=False,
+        metadata={
+            "help": "If set to True and a vocab file exists in tokenizer saving path (indicated by "
+                    "`tokenizer_saving_path` arg), a new vocab file will be built and replace the old one."
+                    "If no vocab file found, a new vocab file will be built."
+        }
+    )
+    overwrite_tokenizer: bool = field(
+        default=False,
+        metadata={
+            "help": "If set to True, If there is already a pretrained tokenizer in tokenizer saving path (indicated"
+                    "by `tokenizer_saving_path` arg), a new tokenizer will be built and replaced by that. If set to"
+                    "False, the already pretrained tokenizer will be loaded (if exists)."
+        }
+    )
 
 
 def main():
