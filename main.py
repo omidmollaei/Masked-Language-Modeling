@@ -169,6 +169,17 @@ def main():
     num_params = model.count_params()
     print(f"Building model finished ! [Total number of params: {num_params}]")
 
+    # -- Build dataset
+    files_ds = tf.data.Dataset.list_files(os.path.join(dataset_args.train_files_path, "*.txt"))
+    dataset = files_ds.interleave(
+        map_func=lambda filepath: tf.data.TextLineDataset(filepath),
+        cycle_length=dataset_args.cycle_length,
+        num_parallel_calls=tf.data.AUTOTUNE,
+    )
+    dataset = dataset.filter(lambda line: tf.strings.length(line) > 0)  # filter out empty lines
+    for i in dataset.take(15):
+        print(i)
+
 
 if __name__ == "__main__":
     main()
