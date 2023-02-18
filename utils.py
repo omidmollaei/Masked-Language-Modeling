@@ -315,6 +315,7 @@ class SubWordTokenizer(tf.Module):
         self.start_token_id = tf.argmax(tf.constant(self.vocab == self._reserved_tokens.start))
         self.end_token_id = tf.argmax(tf.constant(self.vocab == self._reserved_tokens.end))
         self.pad_token_id = tf.argmax(tf.constant(self.vocab == self._reserved_tokens.padding))
+        self.mask_token_id = tf.argmax(tf.constant(self.vocab == self._reserved_tokens.mask))
 
         # create signature for export:
         self.tokenize.get_concrete_function(tf.TensorSpec(shape=[None], dtype=tf.string))
@@ -400,3 +401,7 @@ def load_tokenizer(path: str):
     """
     reloaded_tokenizer = tf.saved_model.load(path)
     return reloaded_tokenizer
+
+
+
+
