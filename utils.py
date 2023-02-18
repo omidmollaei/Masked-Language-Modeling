@@ -403,5 +403,24 @@ def load_tokenizer(path: str):
     return reloaded_tokenizer
 
 
+def mask_tokenized_batch(inputs: tf.Tensor, dataset_args: DataClassType, tokenizer: SubWordTokenizer):
+    """
+    This function applies masking mechanism to input tensor batch.
+    Args:
+         inputs: input tensor batch (examples shape: [64, 512])
+         dataset_args: a namespace (dataclass) contains dataset arguments
+         tokenizer: tokenizer used to tokenize the strings.
+    Returns:
+        masked input with a certain probability with desired output
+    """
+
+    mask = tf.random.uniform(minval=0, maxval=1, shape=tf.shape(inputs)) < dataset_args.mlm_probability
+    reserved_tokens_mask = inputs > 3   # mask tokens: 0, 1, 2
+    mask = tf.math.logical_and(mask, reserved_tokens_mask)
+    mask = tf.fill(tf.shape(mask), tokenizer.mask_token_id) * tf.cast(mask, tf.int64)
+    masked_inputs = tf.reduce_max([inputs, mask])
+
+    return masked_inputs
+
 
 
