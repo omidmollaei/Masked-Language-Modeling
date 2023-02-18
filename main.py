@@ -7,7 +7,7 @@ import os
 import utils
 import tensorflow as tf
 from model import mlm_model
-from typing import Optional, Dict
+from typing import Optional
 from dataclasses import dataclass, field
 
 
@@ -164,7 +164,13 @@ class TrainingDataArguments:
     #    metadata={
     #        "help": "Whether pad the sequences to maximum length (specified by `max_sequence_length`) or not."
     #    }
-    #)
+    # )
+    mlm_probability: Optional[float] = field(
+        default=0.15,
+        metadata={
+            "help": "Probability of masking tokens for MLM task."
+        }
+    )
 
 
 def main():
@@ -200,9 +206,6 @@ def main():
     dataset = dataset.batch(dataset_args.batch_size)
     seq_len = dataset_args.max_sequence_length
     dataset = dataset.map(tokenizer.tokenize).map(lambda x: x.to_tensor(tokenizer.pad_token_id, shape=(None, seq_len)))
-    
-
-
 
 
 if __name__ == "__main__":
