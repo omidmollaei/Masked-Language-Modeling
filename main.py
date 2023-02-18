@@ -131,6 +131,12 @@ class TrainingDataArguments:
             "help": "An instance of another dataclass which holds all the special tokens in one place."
         }
     )
+    batch_size: Optional[int] = field(
+        default=64,
+        metadata={
+            "help": "training dataset batch size."
+        }
+    )
     overwrite_vocab: bool = field(
         default=False,
         metadata={
@@ -147,6 +153,18 @@ class TrainingDataArguments:
                     "False, the already pretrained tokenizer will be loaded (if exists)."
         }
     )
+    max_sequence_length: Optional[int] = field(
+        default=512,
+        metadata={
+            "help": "Max input sequence length."
+        }
+    )
+    # pad_to_max_sequence_length: bool = field(
+    #    default=True,
+    #    metadata={
+    #        "help": "Whether pad the sequences to maximum length (specified by `max_sequence_length`) or not."
+    #    }
+    #)
 
 
 def main():
@@ -176,9 +194,15 @@ def main():
         cycle_length=dataset_args.cycle_length,
         num_parallel_calls=tf.data.AUTOTUNE,
     )
+
+    # -- Preprocessing
     dataset = dataset.filter(lambda line: tf.strings.length(line) > 0)  # filter out empty lines
-    for i in dataset.take(15):
-        print(i)
+    dataset = dataset.batch(dataset_args.batch_size)
+    seq_len = dataset_args.max_sequence_length
+    dataset = dataset.map(tokenizer.tokenize).map(lambda x: x.to_tensor(tokenizer.pad_token_id, shape=(None, seq_len)))
+    
+
+
 
 
 if __name__ == "__main__":
