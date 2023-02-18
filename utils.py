@@ -314,6 +314,7 @@ class SubWordTokenizer(tf.Module):
 
         self.start_token_id = tf.argmax(tf.constant(self.vocab == self._reserved_tokens.start))
         self.end_token_id = tf.argmax(tf.constant(self.vocab == self._reserved_tokens.end))
+        self.pad_token_id = tf.argmax(tf.constant(self.vocab == self._reserved_tokens.padding))
 
         # create signature for export:
         self.tokenize.get_concrete_function(tf.TensorSpec(shape=[None], dtype=tf.string))
