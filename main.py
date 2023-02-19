@@ -174,6 +174,8 @@ class TrainingDataArguments:
 
 
 def main():
+    tf.config.run_functions_eagerly(True)
+    tf.data.experimental.enable_debug_mode()
     parser = utils.MainArgumentParser((ModelArguments, TrainingDataArguments))
     model_args, dataset_args = parser.parse_args_into_dataclasses()
     dataset_args.vocab_size = model_args.vocab_size
@@ -194,6 +196,8 @@ def main():
     print(f"Building model finished ! [Total number of params: {num_params}]")
 
     # -- Build dataset
+    tf.config.run_functions_eagerly(True)
+    tf.data.experimental.enable_debug_mode()
     files_ds = tf.data.Dataset.list_files(os.path.join(dataset_args.train_files_path, "*.txt"))
     dataset = files_ds.interleave(
         map_func=lambda filepath: tf.data.TextLineDataset(filepath),
@@ -202,10 +206,15 @@ def main():
     )
 
     # -- Preprocessing
+    tf.config.run_functions_eagerly(True)
+    tf.data.experimental.enable_debug_mode()
     dataset = dataset.filter(lambda line: tf.strings.length(line) > 0)  # filter out empty lines
     dataset = dataset.batch(dataset_args.batch_size)
     seq_len = dataset_args.max_sequence_length
     dataset = dataset.map(tokenizer.tokenize).map(lambda x: x.to_tensor(tokenizer.pad_token_id, shape=(None, seq_len)))
+
+    # -- Masking
+    dataset_masked = dataset.map(lambda x: utils.mask_tokenized_batch(x, dataset_args, tokenizer))
 
 
 if __name__ == "__main__":
