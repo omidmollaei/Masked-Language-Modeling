@@ -418,7 +418,7 @@ def mask_tokenized_batch(inputs: tf.Tensor, dataset_args: DataClassType, tokeniz
     reserved_tokens_mask = inputs > 3   # mask tokens: 0, 1, 2
     mask = tf.math.logical_and(mask, reserved_tokens_mask)
     mask = tf.fill(tf.shape(mask), tokenizer.mask_token_id) * tf.cast(mask, tf.int64)
-    masked_inputs = tf.reduce_max([inputs, mask])
+    masked_inputs = tf.reduce_max([inputs, mask], axis=0)
 
     return masked_inputs
 
