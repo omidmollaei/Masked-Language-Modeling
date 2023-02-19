@@ -419,8 +419,10 @@ def mask_tokenized_batch(inputs: tf.Tensor, dataset_args: DataClassType, tokeniz
     mask = tf.math.logical_and(mask, reserved_tokens_mask)
     mask = tf.fill(tf.shape(mask), tokenizer.mask_token_id) * tf.cast(mask, tf.int64)
     masked_inputs = tf.reduce_max([inputs, mask], axis=0)
+    outputs_mask = tf.math.equal(masked_inputs, tokenizer.mask_token_id)
+    outputs = inputs * tf.cast(outputs_mask, tf.int64)
+    neg_outputs = tf.cast(tf.fill(tf.shape(masked_inputs), -100), dtype=tf.int64)
+    neg_outputs = neg_outputs * tf.cast(~outputs_mask, dtype=tf.int64)
+    outputs = tf.reduce_sum([outputs, neg_outputs], axis=0)
 
-    return masked_inputs
-
-
-
+    return masked_inputs, outputs
