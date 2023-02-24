@@ -428,3 +428,25 @@ def mask_tokenized_batch(inputs: tf.Tensor, dataset_args: DataClassType, tokeniz
     outputs = tf.reduce_sum([outputs, neg_outputs], axis=0)
 
     return masked_inputs, outputs
+
+
+def masked_loss(y_true: tf.Tensor, y_pred: tf.Tensor):
+    """
+    Compute masked loss.
+    Args:
+        y_true: True labels of input batch (shape: [batch_size, seq_length])
+        y_pred: Predicted logits by model. (shape: [batch_size, seq_length, vocab_size])
+    Returns:
+        Masked (sparse) cross entropy loss (i.e. loss based only on non-masked tokens).
+    """
+    batch_size = tf.shape(y_true)[0]
+    seq_len = tf.shape(y_true)[1]
+    vocab_size = tf.shape(y_pred)[-1]
+    mask = tf.cast(tf.math.not_equal(y_true, tf.constant(-100)), tf.float32)
+    labels = y_true * tf.cast(mask, tf.int32)
+    masked_proba = tf.nn.softmax(y_pred, axis=-1) * mask[..., tf.newaxis]
+    dummy_proba = tf.concat([tf.constant([1.0]), tf.zeros(shape=vocab_size - 1)], axis=-1)
+    dummy_proba = tf.tile([[dummy_proba]], multiples=[batch_size, seq_len, 1])
+    dummy_proba = dummy_proba * (1 - mask)[..., tf.newaxis]
+    final_proba = masked_proba + dummy_proba
+    return cross_entropy_loss(labels, final_proba)
