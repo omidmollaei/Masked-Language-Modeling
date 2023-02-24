@@ -437,7 +437,7 @@ def masked_loss(y_true: tf.Tensor, y_pred: tf.Tensor):
         y_true: True labels of input batch (shape: [batch_size, seq_length])
         y_pred: Predicted logits by model. (shape: [batch_size, seq_length, vocab_size])
     Returns:
-        Masked (sparse) cross entropy loss (i.e. loss based only on non-masked tokens).
+        Masked (sparse) cross entropy loss (i.e. loss based only on masked tokens).
     """
     batch_size = tf.shape(y_true)[0]
     seq_len = tf.shape(y_true)[1]
