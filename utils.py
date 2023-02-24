@@ -2,6 +2,7 @@
 import os
 import re
 import dataclasses
+
 import tensorflow as tf
 import tensorflow_text as text
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any, Iterable, Dict, NewType, Union, Optional, List, get_type
 from tensorflow_text.tools.wordpiece_vocab import bert_vocab_from_dataset as bert_vocab
 
 DataClassType = NewType("DataClassType", Any)
+cross_entropy_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)
 
 
 def string_to_bool(s):
