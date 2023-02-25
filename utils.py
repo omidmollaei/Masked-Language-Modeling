@@ -450,3 +450,21 @@ def masked_loss(y_true: tf.Tensor, y_pred: tf.Tensor):
     dummy_proba = dummy_proba * (1 - mask)[..., tf.newaxis]
     final_proba = masked_proba + dummy_proba
     return cross_entropy_loss(labels, final_proba)
+
+
+def masked_accuracy(y_true: tf.Tensor, y_pred: tf.Tensor):
+    """
+    Masked accuracy metric.
+    Args:
+        y_true: True labels of input batch (shape: [batch_size, seq_length])
+        y_pred: Predicted logits by model. (shape: [batch_size, seq_length, vocab_size])
+    Returns:
+        Masked accuracy.
+    """
+    mask = tf.cast(tf.math.not_equal(y_true, -100), tf.int32)
+    y_true_masked = y_true * mask
+    predictions = tf.argmax(y_pred, axis=-1)
+    predictions_masked = tf.cast(predictions, tf.int32) * mask
+    num_masked_tokens = tf.reduce_sum(tf.cast(tf.math.equal(y_true, -100), tf.int32))
+    accuracy = tf.reduce_sum(tf.cast(tf.equal(y_true_masked, predictions_masked), tf.int32)) - num_masked_tokens
+    return accuracy / tf.reduce_sum(mask)
