@@ -174,8 +174,6 @@ class TrainingDataArguments:
 
 
 def main():
-    tf.config.run_functions_eagerly(True)
-    tf.data.experimental.enable_debug_mode()
     parser = utils.MainArgumentParser((ModelArguments, TrainingDataArguments))
     model_args, dataset_args = parser.parse_args_into_dataclasses()
     dataset_args.vocab_size = model_args.vocab_size
@@ -206,15 +204,20 @@ def main():
     )
 
     # -- Preprocessing
-    tf.config.run_functions_eagerly(True)
-    tf.data.experimental.enable_debug_mode()
+    seq_len = dataset_args.max_sequence_length
     dataset = dataset.filter(lambda line: tf.strings.length(line) > 0)  # filter out empty lines
     dataset = dataset.batch(dataset_args.batch_size)
-    seq_len = dataset_args.max_sequence_length
     dataset = dataset.map(tokenizer.tokenize).map(lambda x: x.to_tensor(tokenizer.pad_token_id, shape=(None, seq_len)))
 
     # -- Masking
     dataset_masked = dataset.map(lambda x: utils.mask_tokenized_batch(x, dataset_args, tokenizer))
+
+    # -- Compile the model
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(),
+        loss=utils.masked_loss,
+        metrics=[utils.masked_accuracy]
+    )
 
 
 if __name__ == "__main__":
