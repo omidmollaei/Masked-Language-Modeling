@@ -173,9 +173,27 @@ class TrainingDataArguments:
     )
 
 
+@dataclass
+class TrainingArguments:
+    """Required arguments for training phase."""
+    epochs: Optional[int] = field(
+        default=1,
+        metadata={
+            "help": "Number of training epochs."
+        }
+    )
+
+    model_checkpoint_path: Optional[str] = field(
+        default=os.path.join("./"),
+        metadata={
+            "help": "Path to save the model in after each epoch."
+        }
+    )
+
+
 def main():
-    parser = utils.MainArgumentParser((ModelArguments, TrainingDataArguments))
-    model_args, dataset_args = parser.parse_args_into_dataclasses()
+    parser = utils.MainArgumentParser((ModelArguments, TrainingDataArguments, TrainingArguments))
+    model_args, dataset_args, train_args = parser.parse_args_into_dataclasses()
     dataset_args.vocab_size = model_args.vocab_size
     init_vocab_size = model_args.vocab_size
 
@@ -217,6 +235,10 @@ def main():
         optimizer=tf.keras.optimizers.Adam(),
         loss=utils.masked_loss,
         metrics=[utils.masked_accuracy]
+    )
+
+    history = model.fit(
+
     )
 
 
