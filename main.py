@@ -237,8 +237,13 @@ def main():
         metrics=[utils.masked_accuracy]
     )
 
+    model_checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(train_args.model_checkpoint_path)
+    print("Train started ... ")
+    print(train_args)
     history = model.fit(
-
+        dataset_masked,
+        epochs=train_args.epochs,
+        callbacks=[model_checkpoint_cb]
     )
 
 
